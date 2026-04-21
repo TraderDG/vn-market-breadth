@@ -83,6 +83,25 @@ export interface SignalEvent {
   fwd_return_1y: number | null
 }
 
+export interface SectorData {
+  code: string
+  label: string
+  current: number | null
+  chg_1d: number | null
+  chg_1w: number | null
+  chg_1m: number | null
+  chg_3m: number | null
+  chg_6m: number | null
+  chg_1y: number | null
+}
+
+export interface SectorsResponse {
+  sectors: SectorData[]
+  dates: string[]
+  series: Record<string, (number | null)[]>
+  last_date: string | null
+}
+
 export interface SignalStats {
   [signalType: string]: {
     count: number

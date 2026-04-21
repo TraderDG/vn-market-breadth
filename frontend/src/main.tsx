@@ -11,6 +11,7 @@ import NewHighLow from './pages/NewHighLow'
 import VolumeBreadth from './pages/VolumeBreadth'
 import AboveMA from './pages/AboveMA'
 import Signals from './pages/Signals'
+import Sectors from './pages/Sectors'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,6 +30,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="nh-nl" element={<NewHighLow />} />
             <Route path="volume" element={<VolumeBreadth />} />
             <Route path="above-ma" element={<AboveMA />} />
+            <Route path="sectors" element={<Sectors />} />
             <Route path="signals" element={<Signals />} />
           </Route>
         </Routes>

@@ -1,6 +1,6 @@
 import type {
   OverviewResponse, BreadthDay, IndicatorSeries,
-  IndicatorMeta, SignalEvent, SignalStats,
+  IndicatorMeta, SignalEvent, SignalStats, SectorsResponse,
 } from './types'
 
 const DATA = import.meta.env.BASE_URL.replace(/\/$/, '') + '/data'
@@ -102,6 +102,9 @@ export const fetchSignalStats = async (): Promise<SignalStats> => {
   }
   return stats
 }
+
+export const fetchSectors = (): Promise<SectorsResponse> =>
+  fetchJSON<SectorsResponse>('sectors.json')
 
 export const triggerRefresh = async () =>
   ({ message: 'Data is updated daily at 18:30 via GitHub Actions' })

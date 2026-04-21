@@ -1,82 +1,113 @@
-import { useState } from 'react'
 import { useHistorical } from '../hooks/useQueries'
-import MultiLineChart from '../components/MultiLineChart'
-import DualChart from '../components/DualChart'
-import Loader from '../components/Loader'
+import Loader, { ErrorMsg } from '../components/Loader'
 import type { BreadthDay } from '../api/types'
 
-const DAYS_OPTIONS = [252, 504, 1260, 3000]
-
-const MA_LINES = [
-  { key: 'pct_above_ma10',  label: '% > MA10',  color: '#ffa657' },
-  { key: 'pct_above_ma20',  label: '% > MA20',  color: '#d29922' },
-  { key: 'pct_above_ma50',  label: '% > MA50',  color: '#3fb950' },
-  { key: 'pct_above_ma100', label: '% > MA100', color: '#388bfd' },
-  { key: 'pct_above_ma200', label: '% > MA200', color: '#a371f7' },
+const MA_COLS = [
+  { key: 'pct_above_ma10',  label: 'MA10',  short: '10' },
+  { key: 'pct_above_ma20',  label: 'MA20',  short: '20' },
+  { key: 'pct_above_ma50',  label: 'MA50',  short: '50' },
+  { key: 'pct_above_ma100', label: 'MA100', short: '100' },
+  { key: 'pct_above_ma200', label: 'MA200', short: '200' },
+  { key: 'disparity_index', label: 'Disparity', short: 'Disp', isDisparity: true },
 ]
 
+function cellColor(value: number | null, isDisparity = false): string {
+  if (value == null) return 'text-brand-muted'
+  const bull = isDisparity ? value > 0 : value > 50
+  const strong = isDisparity ? Math.abs(value) > 5 : (value > 70 || value < 30)
+  if (bull) return strong ? 'text-brand-bull font-semibold' : 'text-brand-bull'
+  return strong ? 'text-brand-bear font-semibold' : 'text-brand-bear'
+}
+
+function cellBg(value: number | null, isDisparity = false): string {
+  if (value == null) return ''
+  const bull = isDisparity ? value > 0 : value > 50
+  if (bull) return 'bg-green-900/20'
+  return 'bg-red-900/20'
+}
+
+function fmt(value: number | null, isDisparity = false): string {
+  if (value == null) return '—'
+  if (isDisparity) return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`
+  return `${value.toFixed(1)}%`
+}
+
 export default function AboveMA() {
-  const [days, setDays] = useState(504)
-  const { data: history, isLoading } = useHistorical(days)
+  const { data: history, isLoading, isError } = useHistorical(60)
 
-  if (isLoading || !history) return <Loader />
+  if (isLoading) return <Loader />
+  if (isError || !history) return <ErrorMsg message="Không thể kết nối API" />
 
-  const dates = history.map((r: BreadthDay) => r.date)
-
-  const multiSeries = MA_LINES.map(({ key, label, color }) => ({
-    label, color, dates,
-    values: history.map((r: BreadthDay) => (r as unknown as Record<string, number | null>)[key]),
-  }))
-
-  const participationSeries = {
-    dates,
-    values: history.map((r: BreadthDay) => r.participation_index),
-    vnindexDates: dates,
-    vnindexValues: history.map((r: BreadthDay) => r.vnindex_close),
-  }
-
-  const disparitySeries = {
-    dates,
-    values: history.map((r: BreadthDay) => r.disparity_index),
-    vnindexDates: dates,
-    vnindexValues: history.map((r: BreadthDay) => r.vnindex_close),
-  }
+  const rows = [...history].reverse()
+  const latest = rows[0]
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-brand-text">% Stocks Above Moving Average</h1>
-          <p className="text-xs text-brand-muted mt-0.5">Group D — Non-internal breadth: % cổ phiếu trên MA10/20/50/100/200</p>
-        </div>
-        <div className="flex gap-1">
-          {DAYS_OPTIONS.map(d => (
-            <button key={d} onClick={() => setDays(d)}
-              className={`px-3 py-1 text-xs font-mono rounded transition-colors ${
-                days === d ? 'bg-brand-accent text-white' : 'bg-brand-surface text-brand-muted border border-brand-border hover:text-brand-text'
-              }`}>
-              {d === 252 ? '1Y' : d === 504 ? '2Y' : d === 1260 ? '5Y' : 'All'}
-            </button>
-          ))}
-        </div>
+      <div>
+        <h1 className="text-lg font-semibold text-brand-text">% Stocks Above Moving Average</h1>
+        <p className="text-xs text-brand-muted mt-0.5">Group D — % cổ phiếu trên MA10 / MA20 / MA50 / MA100 / MA200 và Disparity Index</p>
       </div>
 
-      {/* All 5 MAs on one chart */}
-      <MultiLineChart series={multiSeries} title="% Stocks Above Moving Averages (MA10 / 20 / 50 / 100 / 200)" height={380} />
+      {/* Current values summary */}
+      {latest && (
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          {MA_COLS.map(({ key, label, isDisparity }) => {
+            const val = (latest as unknown as Record<string, number | null>)[key]
+            return (
+              <div key={key} className="card text-center py-3">
+                <div className="text-xs text-brand-muted font-mono mb-1">% {label}</div>
+                <div className={`text-xl font-mono font-bold ${cellColor(val, isDisparity)}`}>
+                  {fmt(val, isDisparity)}
+                </div>
+                <div className={`text-xs mt-1 ${val != null && (isDisparity ? val > 0 : val > 50) ? 'text-brand-bull' : 'text-brand-bear'}`}>
+                  {val != null ? (isDisparity ? (val > 0 ? 'Bull' : 'Bear') : (val > 50 ? 'Bull' : 'Bear')) : '—'}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
-      {/* Individual panels */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <DualChart
-          {...participationSeries}
-          label="Participation Index"
-          indicatorColor="#f0883e"
-        />
-        <DualChart
-          {...disparitySeries}
-          label="Disparity Index (vs MA150)"
-          indicatorColor="#79c0ff"
-          zeroLine
-        />
+      {/* Historical table */}
+      <div className="card overflow-x-auto">
+        <div className="text-sm font-semibold text-brand-text mb-3">Lịch sử 60 phiên gần nhất</div>
+        <table className="w-full text-xs font-mono border-collapse">
+          <thead>
+            <tr className="border-b border-brand-border text-brand-muted text-right">
+              <th className="text-left py-2 pr-4 font-normal">Date</th>
+              <th className="py-2 px-3 font-normal">VNIndex</th>
+              {MA_COLS.map(({ key, label }) => (
+                <th key={key} className="py-2 px-3 font-normal whitespace-nowrap">% {label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row: BreadthDay, i: number) => {
+              const r = row as unknown as Record<string, number | null>
+              return (
+                <tr
+                  key={row.date}
+                  className={`border-b border-brand-border/40 hover:bg-brand-surface/60 transition-colors ${i === 0 ? 'bg-brand-surface' : ''}`}
+                >
+                  <td className={`py-1.5 pr-4 text-left ${i === 0 ? 'text-brand-accent font-semibold' : 'text-brand-muted'}`}>
+                    {row.date}
+                  </td>
+                  <td className="py-1.5 px-3 text-right text-brand-text">
+                    {row.vnindex_close ? row.vnindex_close.toLocaleString('vi-VN') : '—'}
+                  </td>
+                  {MA_COLS.map(({ key, isDisparity }) => {
+                    const val = r[key]
+                    return (
+                      <td key={key} className={`py-1.5 px-3 text-right ${cellColor(val, isDisparity)} ${cellBg(val, isDisparity)}`}>
+                        {fmt(val, isDisparity)}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   )

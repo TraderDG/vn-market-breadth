@@ -10,6 +10,7 @@ const NAV = [
   { to: '/nh-nl',     label: 'NH-NL',          icon: '△▽' },
   { to: '/volume',    label: 'Volume',          icon: '▊' },
   { to: '/above-ma',  label: '% Above MA',     icon: '▲' },
+  { to: '/sectors',   label: 'Sectors',         icon: '◈' },
   { to: '/signals',   label: 'Signals',         icon: '⚡' },
 ]
 

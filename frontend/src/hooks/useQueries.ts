@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   fetchOverview, fetchHistorical, fetchIndicatorSeries,
   fetchIndicatorList, fetchSignalHistory, fetchSignalStats, fetchActiveSignals,
+  fetchSectors,
 } from '../api/breadth'
 
 export const useOverview = () =>
@@ -28,3 +29,6 @@ export const useSignalStats = () =>
 
 export const useActiveSignals = () =>
   useQuery({ queryKey: ['active-signals'], queryFn: fetchActiveSignals, refetchInterval: 60_000 })
+
+export const useSectors = () =>
+  useQuery({ queryKey: ['sectors'], queryFn: fetchSectors })

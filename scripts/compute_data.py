@@ -367,6 +367,73 @@ INDICATOR_LIST = [
 ]
 
 
+SECTORS = [
+    ("VNFIN",  "Financials"),
+    ("VNMAT",  "Materials"),
+    ("VNIND",  "Industrials"),
+    ("VNHEAL", "Healthcare"),
+    ("VNENE",  "Energy"),
+    ("VNCONS", "Consumer Staples"),
+    ("VNCOND", "Consumer Disc."),
+    ("VNUTI",  "Utilities"),
+    ("VNIT",   "Technology"),
+    ("VNREAL", "Real Estate"),
+]
+
+
+def compute_sectors():
+    df = _read("sectors_relative_performance.csv")
+    if df.empty:
+        return None
+    df = _dates(df)
+    df.sort_values("date", inplace=True)
+    df.reset_index(drop=True, inplace=True)
+
+    cols = [s[0] for s in SECTORS]
+    for c in cols:
+        if c not in df.columns:
+            df[c] = np.nan
+
+    sector_data = []
+    for code, label in SECTORS:
+        series = df[code].astype(float)
+        cur = series.iloc[-1] if not series.empty else None
+
+        def pct_chg(n):
+            if len(series) <= n or series.iloc[-1] is None:
+                return None
+            prev = series.iloc[-n - 1]
+            if prev == 0 or np.isnan(prev):
+                return None
+            return round((float(series.iloc[-1]) / float(prev) - 1) * 100, 2)
+
+        sector_data.append({
+            "code": code,
+            "label": label,
+            "current": clean(cur),
+            "chg_1d":  pct_chg(1),
+            "chg_1w":  pct_chg(5),
+            "chg_1m":  pct_chg(21),
+            "chg_3m":  pct_chg(63),
+            "chg_6m":  pct_chg(126),
+            "chg_1y":  pct_chg(252),
+        })
+
+    # Build time series for chart (last 504 rows)
+    slice_df = df.tail(504)
+    dates = [str(d) for d in slice_df["date"]]
+    series_out = {}
+    for code, _ in SECTORS:
+        series_out[code] = [clean(v) for v in slice_df[code].tolist()]
+
+    return {
+        "sectors": sector_data,
+        "dates": dates,
+        "series": series_out,
+        "last_date": str(df["date"].iloc[-1]) if not df.empty else None,
+    }
+
+
 def main():
     print("=== VN Market Breadth — compute static data ===")
 
@@ -416,6 +483,15 @@ def main():
     # --- indicator_list.json ---
     (OUT_DIR / "indicator_list.json").write_text(json.dumps(INDICATOR_LIST, separators=(",", ":")))
     print(f"  indicator_list.json: {len(INDICATOR_LIST)} indicators")
+
+    # --- sectors.json ---
+    print("Computing sectors...")
+    sectors_data = compute_sectors()
+    if sectors_data:
+        (OUT_DIR / "sectors.json").write_text(json.dumps(sectors_data, separators=(",", ":")))
+        print(f"  sectors.json: {len(sectors_data['sectors'])} sectors, last={sectors_data['last_date']}")
+    else:
+        print("  sectors.json: SKIPPED (no data)")
 
     print("=== Done! ===")
 
