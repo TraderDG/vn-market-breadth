@@ -2,7 +2,7 @@ import { useOverview, useHistorical } from '../hooks/useQueries'
 import BreadthMeter from '../components/BreadthMeter'
 import IndicatorCard from '../components/IndicatorCard'
 import Loader, { ErrorMsg } from '../components/Loader'
-import { fmt, fmtPct, retColor } from '../utils/format'
+import { retColor } from '../utils/format'
 import type { BreadthDay } from '../api/types'
 
 const GROUP_A = [
@@ -46,7 +46,9 @@ function SectionHeader({ title, count }: { title: string; count: number }) {
   )
 }
 
-function CardGrid({ items, row }: { items: typeof GROUP_A; row: BreadthDay }) {
+type GroupItem = { key: string; label: string; bull: (v: number) => boolean; format?: 'pct' | 'number' }
+
+function CardGrid({ items, row }: { items: GroupItem[]; row: BreadthDay }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-2">
       {items.map(({ key, label, bull, format }) => (

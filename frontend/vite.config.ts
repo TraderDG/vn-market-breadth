@@ -1,19 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+const isGitHubPages = process.env.GITHUB_PAGES === 'true'
+
 export default defineConfig({
   plugins: [react()],
+  base: isGitHubPages ? '/vn-market-breadth/' : '/',
   server: {
     port: 3000,
-    proxy: {
-      '/api': {
-        target: process.env.VITE_API_URL ?? 'http://localhost:8000',
-        changeOrigin: true,
-      },
-    },
-  },
-  define: {
-    // Make API base URL configurable via env
-    __API_BASE__: JSON.stringify(process.env.VITE_API_URL ?? ''),
   },
 })

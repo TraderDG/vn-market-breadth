@@ -35,7 +35,7 @@ export default function MultiLineChart({ series, title, height = 340 }: Props) {
     series.forEach((s, i) => {
       const lineSeries = chart.addLineSeries({
         color: s.color ?? COLORS[i % COLORS.length],
-        lineWidth: s.lineWidth ?? 2,
+        lineWidth: (s.lineWidth ?? 2) as 1 | 2 | 3 | 4,
         title: s.label,
       })
       const data = s.dates

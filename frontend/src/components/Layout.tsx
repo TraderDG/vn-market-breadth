@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import { useActiveSignals } from '../hooks/useQueries'
 import { triggerRefresh } from '../api/breadth'
 import { useState } from 'react'
@@ -16,7 +16,7 @@ const NAV = [
 export default function Layout() {
   const { data: activeSignals } = useActiveSignals()
   const [refreshing, setRefreshing] = useState(false)
-  const signalCount = activeSignals?.count ?? 0
+  const signalCount = activeSignals?.length ?? 0
 
   const handleRefresh = async () => {
     setRefreshing(true)

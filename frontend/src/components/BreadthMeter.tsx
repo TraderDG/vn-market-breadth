@@ -16,7 +16,8 @@ export default function BreadthMeter({ score, label, signalsActive }: Props) {
     return { x: 120 + r * Math.cos(rad), y: 110 + r * Math.sin(rad) }
   }
 
-  const needle = polarToXY(angle - 90 + 90, 70) // adjust for SVG coords
+  void angle // used via clampedScore in transform below
+  void polarToXY
 
   const signalLabels: Record<string, string> = {
     BREADTH_THRUST: 'Breadth Thrust',

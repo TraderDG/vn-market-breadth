@@ -20,6 +20,9 @@ node_modules/
 frontend/dist/
 frontend/.vite/
 
+# Generated static data (produced by scripts/compute_data.py)
+frontend/public/data/*.json
+
 # IDE
 .vscode/
 .idea/
