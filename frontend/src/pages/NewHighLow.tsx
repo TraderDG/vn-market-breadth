@@ -7,9 +7,8 @@ import { fmt, retColor } from '../utils/format'
 const DAYS_OPTIONS = [252, 504, 1260, 3000]
 
 const INDICATORS = [
-  { id: 'nh_nl_line',  label: 'New High - New Low Line',  color: '#3fb950', zero: false },
-  { id: 'nh_nl_osc',   label: 'NH-NL Oscillator (10d EMA)', color: '#58a6ff', zero: true  },
-  { id: 'nh_nl_ratio', label: 'NH-NL Ratio (10d smooth)', color: '#d29922', zero: false },
+  { id: 'new_high_52w_vn30',  label: 'New 52-Week High (VN30)',  color: '#3fb950', zero: false },
+  { id: 'new_high_1m_hnx30', label: 'New 1-Month High (HNX30)', color: '#58a6ff', zero: false },
 ]
 
 function IndicatorPanel({ id, label, color, zero, days }: {
@@ -29,14 +28,16 @@ function IndicatorPanel({ id, label, color, zero, days }: {
 
 export default function NewHighLow() {
   const [days, setDays] = useState(504)
-  const { data: hindenburg } = useSignalHistory('HINDENBURG_OMEN')
+  const { data: rsiSignals } = useSignalHistory('RSI_OVERSOLD_REVERSAL')
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-brand-text">New High / New Low</h1>
-          <p className="text-xs text-brand-muted mt-0.5">Group B — 52-week highs vs lows trên VN100</p>
+          <p className="text-xs text-brand-muted mt-0.5">
+            Số cổ phiếu lập đỉnh 52 tuần (VN30) và đỉnh 1 tháng (HNX30)
+          </p>
         </div>
         <div className="flex gap-1">
           {DAYS_OPTIONS.map(d => (
@@ -54,10 +55,12 @@ export default function NewHighLow() {
         {INDICATORS.map(ind => <IndicatorPanel key={ind.id} {...ind} days={days} />)}
       </div>
 
-      {/* Hindenburg Omen history */}
-      {hindenburg && hindenburg.length > 0 && (
+      {/* RSI Oversold Reversal signals */}
+      {rsiSignals && rsiSignals.length > 0 && (
         <div className="card">
-          <div className="text-sm font-semibold text-brand-bear mb-3">Hindenburg Omen — Lịch sử tín hiệu</div>
+          <div className="text-sm font-semibold text-brand-accent mb-3">
+            RSI Oversold Reversal — Lịch sử tín hiệu
+          </div>
           <table className="w-full text-xs font-mono">
             <thead>
               <tr className="text-brand-muted border-b border-brand-border">
@@ -70,9 +73,9 @@ export default function NewHighLow() {
               </tr>
             </thead>
             <tbody>
-              {hindenburg.map(e => (
+              {rsiSignals.slice(-20).reverse().map(e => (
                 <tr key={e.id} className="border-b border-brand-border/30 hover:bg-brand-border/20">
-                  <td className="py-1.5 pr-4 text-brand-bear">{e.date}</td>
+                  <td className="py-1.5 pr-4 text-brand-accent">{e.date}</td>
                   <td className="text-right pr-4 text-brand-text">{fmt(e.vnindex_at_signal, 0)}</td>
                   <td className={`text-right pr-4 ${retColor(e.fwd_return_1m)}`}>{e.fwd_return_1m != null ? `${e.fwd_return_1m >= 0 ? '+' : ''}${e.fwd_return_1m.toFixed(1)}%` : '—'}</td>
                   <td className={`text-right pr-4 ${retColor(e.fwd_return_3m)}`}>{e.fwd_return_3m != null ? `${e.fwd_return_3m >= 0 ? '+' : ''}${e.fwd_return_3m.toFixed(1)}%` : '—'}</td>

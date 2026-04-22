@@ -5,15 +5,13 @@ import Loader, { ErrorMsg } from '../components/Loader'
 
 const DAYS_OPTIONS = [252, 504, 1260, 3000]
 const INDICATORS = [
-  { id: 'ad_line',        label: 'A/D Line',                   color: '#388bfd', zero: false },
-  { id: 'mcclellan_osc',  label: 'McClellan Oscillator',        color: '#a371f7', zero: true  },
-  { id: 'mcclellan_sum',  label: 'McClellan Summation Index',   color: '#79c0ff', zero: true  },
-  { id: 'breadth_thrust', label: 'Breadth Thrust (Zweig)',      color: '#3fb950', zero: false },
-  { id: 'ad_oscillator',  label: 'A/D Line Oscillator',         color: '#d29922', zero: true  },
-  { id: 'abs_breadth_index','label': 'Absolute Breadth Index', color: '#f0883e', zero: false },
-  { id: 'roc5_ad',        label: 'ROC5 of A/D Line',            color: '#ffa657', zero: true  },
-  { id: 'ad_ratio_5d',    label: 'A/D Ratio (5-day)',           color: '#58a6ff', zero: false },
-  { id: 'ad_ratio_10d',   label: 'A/D Ratio (10-day)',          color: '#56d364', zero: false },
+  { id: 'adline_vn30',         label: 'A/D Line (VN30)',               color: '#388bfd', zero: false },
+  { id: 'mcclellan_osc_vn100', label: 'McClellan Oscillator (VN100)',  color: '#a371f7', zero: true  },
+  { id: 'mcclellan_sum',       label: 'McClellan Summation (VN100)',   color: '#79c0ff', zero: true  },
+  { id: 'ad_oscillator',       label: 'A/D Line Oscillator (VN30)',    color: '#d29922', zero: true  },
+  { id: 'abs_breadth_index',   label: 'Absolute Breadth Index (VN30)', color: '#f0883e', zero: false },
+  { id: 'roc5_ad',             label: 'ROC5 of A/D Line (VN30)',       color: '#ffa657', zero: true  },
+  { id: 'declines_vn30',       label: 'Declines Count (VN30)',         color: '#f85149', zero: false },
 ]
 
 function IndicatorPanel({ id, label, color, zero, days }: {
@@ -43,7 +41,9 @@ export default function ADLine() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-brand-text">Advance / Decline Indicators</h1>
-          <p className="text-xs text-brand-muted mt-0.5">Group A — 9 indicators từ Advances/Declines hàng ngày</p>
+          <p className="text-xs text-brand-muted mt-0.5">
+            A/D Line và McClellan — VN30 (A/D) và VN100 (McClellan)
+          </p>
         </div>
         <div className="flex gap-1">
           {DAYS_OPTIONS.map(d => (

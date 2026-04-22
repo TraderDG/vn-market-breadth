@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Standalone script: read CSVs from backend/data/, compute all indicators,
+Standalone script: read CSVs from backend/data/csv2/, compute all indicators,
 write JSON files to frontend/public/data/.
 Run from project root: python scripts/compute_data.py
 """
@@ -10,7 +10,10 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
+sys.stdout.reconfigure(encoding='utf-8')
+
 ROOT = Path(__file__).parent.parent
+CSV2_DIR = ROOT / "backend" / "data" / "csv2"
 DATA_DIR = ROOT / "backend" / "data"
 OUT_DIR = ROOT / "frontend" / "public" / "data"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -19,23 +22,15 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-def _read(name, **kw):
-    p = DATA_DIR / name
+def _read_csv2(name):
+    p = CSV2_DIR / name
     if not p.exists():
         print(f"  MISSING: {p}")
-        return pd.DataFrame()
-    return pd.read_csv(p, **kw)
-
-
-def _dates(df, col="Date"):
-    for c in df.columns:
-        if c.lower() in ("date", "datetime"):
-            col = c
-            break
-    df = df.copy()
-    df[col] = pd.to_datetime(df[col]).dt.normalize().dt.date
-    df.rename(columns={col: "date"}, inplace=True)
-    return df
+        return pd.DataFrame(columns=["date", "value"])
+    df = pd.read_csv(p)
+    df["Date"] = pd.to_datetime(df["Date"]).dt.date
+    df.rename(columns={"Date": "date", "Value": "value"}, inplace=True)
+    return df[["date", "value"]].dropna(subset=["date"])
 
 
 def _ema(s, span):
@@ -63,101 +58,62 @@ def clean(v):
 
 
 # ---------------------------------------------------------------------------
-# CSV Loaders
+# CSV2 source files (22 usable files, 4 all-zero excluded)
 # ---------------------------------------------------------------------------
-def load_ad_line():
-    df = _read("VNINDEX_A-D_line_Data.csv")
-    if df.empty:
-        return df
-    df = _dates(df)
-    df.rename(columns={"VNINDEX": "vnindex_close", "AD_Line": "ad_line"}, inplace=True)
-    return df[["date", "vnindex_close", "ad_line"]]
-
-
-def load_nh_nl():
-    df = _read("NH_NL_Subtraction_VNINDEX_Data.csv")
-    if df.empty:
-        return df
-    df = _dates(df)
-    df.rename(columns={"NH": "new_highs", "NL": "new_lows", "Net_High_Low": "nh_nl_line"}, inplace=True)
-    return df[["date", "new_highs", "new_lows", "nh_nl_line"]]
-
-
-def load_above_ma():
-    df = _read("Market_Breadth__aboveMA_VNINDEX_Data.csv")
-    if df.empty:
-        return df
-    df = _dates(df)
-    df.rename(columns={
-        "MA10": "pct_above_ma10", "MA20": "pct_above_ma20",
-        "MA50": "pct_above_ma50", "MA100": "pct_above_ma100", "MA200": "pct_above_ma200",
-    }, inplace=True)
-    cols = ["date"] + [c for c in ["pct_above_ma10", "pct_above_ma20", "pct_above_ma50",
-                                    "pct_above_ma100", "pct_above_ma200"] if c in df.columns]
-    return df[cols]
-
-
-def load_ad_ratio():
-    df = _read("market_breadth_vn100_returndaily_ADratio.csv")
-    if df.empty:
-        return df
-    df = _dates(df)
-    df.rename(columns={
-        "Number_of_stocks_up_2pct": "up2",
-        "Number_of_stocks_down_2pct": "dn2",
-        "AD_ratio_5day": "ad_ratio_5d",
-        "AD_ratio_10day": "ad_ratio_10d",
-    }, inplace=True)
-    df["daily_ad_ratio_2pct"] = df["up2"] / df["dn2"].replace(0, np.nan)
-    return df[["date", "ad_ratio_5d", "ad_ratio_10d", "daily_ad_ratio_2pct"]]
-
-
-def load_quarterly():
-    df = _read("market_breadth_vn100_quarterlyreturn.csv")
-    if df.empty:
-        return df
-    df = _dates(df)
-    df.rename(columns={
-        "Number_of_stocks_up_10pct_quarterly": "qup",
-        "Number_of_stocks_down_10pct_quarterly": "qdn",
-        "Total_stocks": "qtotal",
-    }, inplace=True)
-    df["quarterly_breadth_up"] = df["qup"] / df["qtotal"].replace(0, np.nan) * 100
-    df["quarterly_breadth_down"] = df["qdn"] / df["qtotal"].replace(0, np.nan) * 100
-    df["total_stocks"] = df["qtotal"]
-    return df[["date", "quarterly_breadth_up", "quarterly_breadth_down", "total_stocks"]]
-
-
-def load_up_volume():
-    df = _read("UpVolume_pct_merged.csv")
-    if df.empty:
-        return df
-    df = _dates(df, col="date")
-    df.rename(columns={
-        "UpVolume": "up_volume",
-        "TotalVolume": "total_volume",
-        "UpVolume_pct": "up_volume_pct",
-    }, inplace=True)
-    df["down_volume"] = df["total_volume"] - df["up_volume"]
-    return df[["date", "up_volume", "down_volume", "up_volume_pct"]]
+CSV2_FILES = [
+    ("ADLines_VN30.csv",                  "adline_vn30"),
+    ("McClellanOsc_ratio_VN100.csv",       "mcclellan_osc_vn100"),
+    ("Declines_VN30.csv",                  "declines_vn30"),
+    ("New_High_52_VN30_week.csv",          "new_high_52w_vn30"),
+    ("New_High_1_HNX30_month.csv",         "new_high_1m_hnx30"),
+    ("UpVolume_Hnx.csv",                   "up_vol_hnx"),
+    ("DownVolume_HNX30_percent.csv",       "down_vol_hnx30"),
+    ("Unchanged_Upcom.csv",                "unchanged_upcom"),
+    ("Above_Ma_100_VN100.csv",             "above_ma100_vn100"),
+    ("RSI_25_Vnindex.csv",                 "rsi_25_vnindex"),
+    ("RSI_25_VN100.csv",                   "rsi_25_vn100"),
+    ("RSI_25_VN30.csv",                    "rsi_25_vn30"),
+    ("RSI_25_HNX30.csv",                   "rsi_25_hnx30"),
+    ("RSI_25_Hnx.csv",                     "rsi_25_hnx"),
+    ("RSI_75_Vnindex.csv",                 "rsi_75_vnindex"),
+    ("RSI_75_VN100.csv",                   "rsi_75_vn100"),
+    ("RSI_75_VN30.csv",                    "rsi_75_vn30"),
+    ("RSI_75_HNX30.csv",                   "rsi_75_hnx30"),
+    ("RSI_75_Hnx.csv",                     "rsi_75_hnx"),
+    ("under_std_2_Hnx.csv",                "bb_under_2std_hnx"),
+    ("Return_12_VNALL_month.csv",          "return_12m_vnall"),
+    ("Return_12_percent_VN30_month.csv",   "return_12m_vn30"),
+]
 
 
 # ---------------------------------------------------------------------------
 # Build merged DataFrame
 # ---------------------------------------------------------------------------
 def build_df():
-    loaders = [load_ad_line, load_nh_nl, load_above_ma, load_ad_ratio, load_quarterly, load_up_volume]
-    frames = [fn() for fn in loaders]
-    frames = [f for f in frames if not f.empty]
+    # Load VNINDEX close for reference (old file, up to 2026-03-16)
+    vnindex_df = pd.DataFrame()
+    vnindex_path = DATA_DIR / "VNINDEX_A-D_line_Data.csv"
+    if vnindex_path.exists():
+        vn = pd.read_csv(vnindex_path)
+        vn["Date"] = pd.to_datetime(vn["Date"]).dt.date
+        vn.rename(columns={"Date": "date", "VNINDEX": "vnindex_close"}, inplace=True)
+        vnindex_df = vn[["date", "vnindex_close"]].dropna(subset=["date"])
 
-    if not frames:
-        print("ERROR: no data loaded")
-        return pd.DataFrame()
+    # Load all CSV2 indicator files
+    frames = []
+    for fname, colname in CSV2_FILES:
+        df = _read_csv2(fname)
+        df.rename(columns={"value": colname}, inplace=True)
+        frames.append(df)
 
-    base = frames[0]
+    base = frames[0].copy()
     for df in frames[1:]:
-        new_cols = [c for c in df.columns if c not in base.columns or c == "date"]
-        base = base.merge(df[new_cols], on="date", how="outer")
+        base = base.merge(df, on="date", how="outer")
+
+    if not vnindex_df.empty:
+        base = base.merge(vnindex_df, on="date", how="outer")
+    else:
+        base["vnindex_close"] = np.nan
 
     base.sort_values("date", inplace=True)
     base.reset_index(drop=True, inplace=True)
@@ -165,66 +121,40 @@ def build_df():
 
 
 # ---------------------------------------------------------------------------
-# Compute indicators
+# Compute derived indicators
 # ---------------------------------------------------------------------------
 def compute_indicators(df):
     df = df.copy().sort_values("date").reset_index(drop=True)
 
-    net_ad = df["ad_line"].diff().fillna(0) if "ad_line" in df.columns else pd.Series(0.0, index=df.index)
+    # McClellan Summation = cumulative sum of McClellan Oscillator
+    if "mcclellan_osc_vn100" in df.columns:
+        df["mcclellan_sum"] = df["mcclellan_osc_vn100"].fillna(0).cumsum()
 
-    df["mcclellan_osc"] = _ema(net_ad, 19) - _ema(net_ad, 39)
-    df["mcclellan_sum"] = df["mcclellan_osc"].cumsum()
-
-    if "ad_line" in df.columns:
-        df["ad_oscillator"] = _sma(df["ad_line"], 10) - _sma(df["ad_line"], 30)
+    # Derived from VN30 A/D Line
+    if "adline_vn30" in df.columns:
+        adline = df["adline_vn30"].astype(float)
+        daily_chg = adline.diff().fillna(0)
+        df["ad_oscillator"] = _ema(adline, 10) - _ema(adline, 30)
         df["roc5_ad"] = (
-            (df["ad_line"] - df["ad_line"].shift(5))
-            / df["ad_line"].shift(5).abs().replace(0, np.nan)
-            * 100
+            (adline - adline.shift(5))
+            / adline.shift(5).abs().replace(0, np.nan) * 100
         )
+        df["abs_breadth_index"] = _ema(daily_chg.abs(), 21)
 
-    df["abs_breadth_index"] = _ema(net_ad.abs(), 21)
+    # Volume derived (Up=HNX, Down=HNX30 — same exchange family)
+    if "up_vol_hnx" in df.columns and "down_vol_hnx30" in df.columns:
+        uv = df["up_vol_hnx"].astype(float)
+        dv = df["down_vol_hnx30"].astype(float)
+        total = uv + dv
+        df["up_volume_pct"] = uv / total.replace(0, np.nan) * 100
+        df["uv_dv_ratio"] = uv / dv.replace(0, np.nan)
+        df["net_up_volume_ema10"] = _ema((uv - dv), 10)
 
-    if "up_volume_pct" in df.columns:
-        df["breadth_thrust"] = _ema(df["up_volume_pct"] / 100, 10)
-    elif "ad_ratio_5d" in df.columns:
-        df["breadth_thrust"] = df["ad_ratio_5d"]
-
-    if "new_highs" in df.columns and "new_lows" in df.columns:
-        if "nh_nl_line" not in df.columns:
-            df["nh_nl_line"] = (df["new_highs"] - df["new_lows"]).cumsum()
-        nh_nl_net = (df["new_highs"] - df["new_lows"]).astype(float)
-        df["nh_nl_osc"] = _ema(nh_nl_net, 10)
-        total_hl = df["new_highs"] + df["new_lows"]
-        df["nh_nl_ratio"] = (df["new_highs"] / total_hl.replace(0, np.nan)).rolling(10, min_periods=1).mean()
-
-        if "total_stocks" in df.columns:
-            nh_pct = df["new_highs"] / df["total_stocks"].replace(0, np.nan)
-            nl_pct = df["new_lows"] / df["total_stocks"].replace(0, np.nan)
-        else:
-            denom = (df["new_highs"] + df["new_lows"]).replace(0, np.nan)
-            nh_pct = df["new_highs"] / denom
-            nl_pct = df["new_lows"] / denom
-
-        vnindex_rising = df["vnindex_close"] > df["vnindex_close"].rolling(50, min_periods=1).min()
-        df["hindenburg_omen"] = (
-            (nh_pct > 0.022) & (nl_pct > 0.022) &
-            (df["mcclellan_osc"] < 0) & vnindex_rising
-        ).fillna(False)
-
-    if "up_volume" in df.columns and "down_volume" in df.columns:
-        df["uv_dv_ratio"] = df["up_volume"] / df["down_volume"].replace(0, np.nan)
-        df["net_up_volume_ema10"] = _ema((df["up_volume"] - df["down_volume"]).astype(float), 10)
-        if "up_volume_pct" not in df.columns:
-            total_v = df["up_volume"] + df["down_volume"]
-            df["up_volume_pct"] = df["up_volume"] / total_v.replace(0, np.nan) * 100
-
-    if "up_volume_pct" in df.columns:
-        df["volume_thrust_signal"] = df["up_volume_pct"].rolling(10, min_periods=1).max() > 90
-
+    # Disparity index from VNINDEX close
     if "vnindex_close" in df.columns:
-        ma150 = df["vnindex_close"].rolling(150, min_periods=1).mean()
-        df["disparity_index"] = (df["vnindex_close"] / ma150 - 1) * 100
+        vc = df["vnindex_close"].astype(float)
+        ma150 = vc.rolling(150, min_periods=1).mean()
+        df["disparity_index"] = (vc / ma150.replace(0, np.nan) - 1) * 100
 
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
     return df
@@ -241,21 +171,19 @@ def calc_breadth_score(row):
         if v is not None and not (isinstance(v, float) and math.isnan(v)):
             score.append(1.0 if bull_fn(v) else 0.0)
 
-    s("mcclellan_osc", lambda v: v > 0)
-    s("mcclellan_sum", lambda v: v > 0)
-    s("ad_ratio_5d", lambda v: v > 0.5)
-    s("ad_ratio_10d", lambda v: v > 0.5)
-    s("breadth_thrust", lambda v: v > 0.5)
-    s("ad_oscillator", lambda v: v > 0)
-    s("roc5_ad", lambda v: v > 0)
-    s("nh_nl_osc", lambda v: v > 0)
-    s("nh_nl_ratio", lambda v: v > 0.5)
-    s("uv_dv_ratio", lambda v: v > 1.0)
-    s("up_volume_pct", lambda v: v > 50.0)
-    for ma in ["pct_above_ma10", "pct_above_ma20", "pct_above_ma50", "pct_above_ma100", "pct_above_ma200"]:
-        s(ma, lambda v: v > 50.0)
-    s("disparity_index", lambda v: v > 0)
-    s("daily_ad_ratio_2pct", lambda v: v > 1.0)
+    s("mcclellan_osc_vn100", lambda v: v > 0)
+    s("mcclellan_sum",       lambda v: v > 0)
+    s("ad_oscillator",       lambda v: v > 0)
+    s("roc5_ad",             lambda v: v > 0)
+    s("new_high_52w_vn30",   lambda v: v > 0)
+    s("up_volume_pct",       lambda v: v > 50)
+    s("uv_dv_ratio",         lambda v: v > 1)
+    s("above_ma100_vn100",   lambda v: v > 50)
+    s("rsi_25_vnindex",      lambda v: v < 20)  # many oversold = contrarian bull
+    s("rsi_75_vnindex",      lambda v: v > 20)  # many overbought = bull momentum
+    s("rsi_75_vn30",         lambda v: v > 20)
+    s("disparity_index",     lambda v: v > 0)
+    s("return_12m_vn30",     lambda v: v > 0)
 
     return round(sum(score) / len(score) * 100, 1) if score else 50.0
 
@@ -273,8 +201,11 @@ def get_label(score):
 # ---------------------------------------------------------------------------
 def compute_signals(df):
     events = []
-    vnindex = df.set_index("date")["vnindex_close"].dropna() if "vnindex_close" in df.columns else None
-    all_dates = list(vnindex.index) if vnindex is not None else []
+    vnindex = (
+        df.set_index("date")["vnindex_close"].dropna()
+        if "vnindex_close" in df.columns else pd.Series(dtype=float)
+    )
+    all_dates = list(vnindex.index)
 
     def fwd_ret(sig_date, sig_price, days):
         if sig_price is None or (isinstance(sig_price, float) and math.isnan(sig_price)):
@@ -297,28 +228,23 @@ def compute_signals(df):
             "fwd_return_1y": fwd_ret(date, p, 252),
         })
 
-    if "breadth_thrust" in df.columns:
-        bt = df["breadth_thrust"]
+    # RSI Oversold Reversal: rsi_25_vnindex crosses above 30% (many oversold → potential bounce)
+    if "rsi_25_vnindex" in df.columns and "vnindex_close" in df.columns:
+        col = df["rsi_25_vnindex"]
+        for i in range(1, len(df)):
+            if pd.notna(col.iloc[i - 1]) and pd.notna(col.iloc[i]):
+                if col.iloc[i - 1] < 30 and col.iloc[i] >= 30:
+                    add(df["date"].iloc[i], "RSI_OVERSOLD_REVERSAL",
+                        df["vnindex_close"].iloc[i])
+
+    # Volume Thrust: up_volume_pct surges from below 40 to above 70 in 10-day window
+    if "up_volume_pct" in df.columns:
+        col = df["up_volume_pct"]
         for i in range(10, len(df)):
-            w = bt.iloc[i - 10:i + 1]
-            if pd.notna(w.min()) and w.min() < 0.40 and w.iloc[-1] > 0.615:
-                add(df["date"].iloc[i], "BREADTH_THRUST",
+            w = col.iloc[i - 10:i + 1]
+            if pd.notna(w.min()) and w.min() < 40 and col.iloc[i] > 70:
+                add(df["date"].iloc[i], "VOLUME_THRUST",
                     df["vnindex_close"].iloc[i] if "vnindex_close" in df.columns else None)
-
-    # Rising-edge only: fire once when condition transitions False→True
-    def rising_edge_rows(col):
-        sig = df[col].astype(bool)
-        prev = sig.shift(1).infer_objects(copy=False).fillna(False).astype(bool)
-        edge = sig & ~prev
-        return df[edge]
-
-    if "hindenburg_omen" in df.columns:
-        for _, row in rising_edge_rows("hindenburg_omen").iterrows():
-            add(row["date"], "HINDENBURG_OMEN", row.get("vnindex_close"))
-
-    if "volume_thrust_signal" in df.columns:
-        for _, row in rising_edge_rows("volume_thrust_signal").iterrows():
-            add(row["date"], "VOLUME_THRUST", row.get("vnindex_close"))
 
     # Deduplicate by (date, signal_type)
     seen = set()
@@ -329,7 +255,6 @@ def compute_signals(df):
             seen.add(k)
             deduped.append(e)
 
-    # Add synthetic id
     for i, e in enumerate(deduped):
         e["id"] = i + 1
 
@@ -337,36 +262,52 @@ def compute_signals(df):
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Indicator list (based strictly on CSV2 sources + derived)
 # ---------------------------------------------------------------------------
 INDICATOR_LIST = [
-    {"id": "ad_line",              "label": "A/D Line",                      "column": "ad_line",              "group": "A/D"},
-    {"id": "mcclellan_osc",        "label": "McClellan Oscillator",           "column": "mcclellan_osc",        "group": "A/D"},
-    {"id": "mcclellan_sum",        "label": "McClellan Summation Index",      "column": "mcclellan_sum",        "group": "A/D"},
-    {"id": "ad_ratio_5d",          "label": "A/D Ratio (5-day)",              "column": "ad_ratio_5d",          "group": "A/D"},
-    {"id": "ad_ratio_10d",         "label": "A/D Ratio (10-day)",             "column": "ad_ratio_10d",         "group": "A/D"},
-    {"id": "breadth_thrust",       "label": "Breadth Thrust (Zweig)",         "column": "breadth_thrust",       "group": "A/D"},
-    {"id": "ad_oscillator",        "label": "A/D Line Oscillator",            "column": "ad_oscillator",        "group": "A/D"},
-    {"id": "abs_breadth_index",    "label": "Absolute Breadth Index",         "column": "abs_breadth_index",    "group": "A/D"},
-    {"id": "roc5_ad",              "label": "ROC5 of A/D Line",               "column": "roc5_ad",              "group": "A/D"},
-    {"id": "nh_nl_line",           "label": "New High-New Low Line",          "column": "nh_nl_line",           "group": "NH-NL"},
-    {"id": "nh_nl_osc",            "label": "NH-NL Oscillator",               "column": "nh_nl_osc",            "group": "NH-NL"},
-    {"id": "nh_nl_ratio",          "label": "NH-NL Ratio",                    "column": "nh_nl_ratio",          "group": "NH-NL"},
-    {"id": "uv_dv_ratio",          "label": "Up/Down Volume Ratio",           "column": "uv_dv_ratio",          "group": "Volume"},
-    {"id": "up_volume_pct",        "label": "Up Volume %",                    "column": "up_volume_pct",        "group": "Volume"},
-    {"id": "net_up_volume_ema10",  "label": "Net Up Volume (10d EMA)",        "column": "net_up_volume_ema10",  "group": "Volume"},
-    {"id": "pct_above_ma10",       "label": "% Stocks above MA10",            "column": "pct_above_ma10",       "group": "Above MA"},
-    {"id": "pct_above_ma20",       "label": "% Stocks above MA20",            "column": "pct_above_ma20",       "group": "Above MA"},
-    {"id": "pct_above_ma50",       "label": "% Stocks above MA50",            "column": "pct_above_ma50",       "group": "Above MA"},
-    {"id": "pct_above_ma100",      "label": "% Stocks above MA100",           "column": "pct_above_ma100",      "group": "Above MA"},
-    {"id": "pct_above_ma200",      "label": "% Stocks above MA200",           "column": "pct_above_ma200",      "group": "Above MA"},
-    {"id": "disparity_index",      "label": "Disparity Index",                "column": "disparity_index",      "group": "Above MA"},
-    {"id": "daily_ad_ratio_2pct",  "label": "Daily Return AD Ratio (±2%)",    "column": "daily_ad_ratio_2pct",  "group": "Return"},
-    {"id": "quarterly_breadth_up", "label": "Quarterly Breadth (Up ≥10%)",    "column": "quarterly_breadth_up", "group": "Return"},
-    {"id": "quarterly_breadth_down","label": "Quarterly Breadth (Down ≤-10%)","column": "quarterly_breadth_down","group": "Return"},
+    # A/D
+    {"id": "adline_vn30",         "label": "A/D Line (VN30)",               "column": "adline_vn30",         "group": "A/D"},
+    {"id": "mcclellan_osc_vn100", "label": "McClellan Oscillator (VN100)",  "column": "mcclellan_osc_vn100", "group": "A/D"},
+    {"id": "mcclellan_sum",       "label": "McClellan Summation (VN100)",   "column": "mcclellan_sum",        "group": "A/D"},
+    {"id": "ad_oscillator",       "label": "A/D Oscillator (VN30)",         "column": "ad_oscillator",        "group": "A/D"},
+    {"id": "roc5_ad",             "label": "ROC5 A/D Line (VN30)",          "column": "roc5_ad",              "group": "A/D"},
+    {"id": "abs_breadth_index",   "label": "Absolute Breadth Index (VN30)", "column": "abs_breadth_index",    "group": "A/D"},
+    {"id": "declines_vn30",       "label": "Declines Count (VN30)",         "column": "declines_vn30",        "group": "A/D"},
+    # NH-NL
+    {"id": "new_high_52w_vn30",   "label": "New 52W High (VN30)",           "column": "new_high_52w_vn30",    "group": "NH-NL"},
+    {"id": "new_high_1m_hnx30",   "label": "New 1M High (HNX30)",           "column": "new_high_1m_hnx30",    "group": "NH-NL"},
+    # Volume
+    {"id": "up_vol_hnx",          "label": "Up Volume (HNX)",               "column": "up_vol_hnx",           "group": "Volume"},
+    {"id": "down_vol_hnx30",      "label": "Down Volume (HNX30)",           "column": "down_vol_hnx30",       "group": "Volume"},
+    {"id": "up_volume_pct",       "label": "Up Volume % (HNX)",             "column": "up_volume_pct",        "group": "Volume"},
+    {"id": "uv_dv_ratio",         "label": "Up/Down Volume Ratio (HNX)",    "column": "uv_dv_ratio",          "group": "Volume"},
+    {"id": "net_up_volume_ema10", "label": "Net Up Volume 10d EMA",         "column": "net_up_volume_ema10",  "group": "Volume"},
+    {"id": "unchanged_upcom",     "label": "Unchanged Stocks (UPCOM)",      "column": "unchanged_upcom",      "group": "Volume"},
+    # % Above MA
+    {"id": "above_ma100_vn100",   "label": "% Above MA100 (VN100)",         "column": "above_ma100_vn100",    "group": "Above MA"},
+    {"id": "disparity_index",     "label": "Disparity Index (VNINDEX)",     "column": "disparity_index",      "group": "Above MA"},
+    # RSI
+    {"id": "rsi_25_vnindex",      "label": "% RSI<25 (VNINDEX)",            "column": "rsi_25_vnindex",       "group": "RSI"},
+    {"id": "rsi_25_vn100",        "label": "% RSI<25 (VN100)",              "column": "rsi_25_vn100",         "group": "RSI"},
+    {"id": "rsi_25_vn30",         "label": "% RSI<25 (VN30)",               "column": "rsi_25_vn30",          "group": "RSI"},
+    {"id": "rsi_25_hnx30",        "label": "% RSI<25 (HNX30)",              "column": "rsi_25_hnx30",         "group": "RSI"},
+    {"id": "rsi_25_hnx",          "label": "% RSI<25 (HNX)",                "column": "rsi_25_hnx",           "group": "RSI"},
+    {"id": "rsi_75_vnindex",      "label": "% RSI>75 (VNINDEX)",            "column": "rsi_75_vnindex",       "group": "RSI"},
+    {"id": "rsi_75_vn100",        "label": "% RSI>75 (VN100)",              "column": "rsi_75_vn100",         "group": "RSI"},
+    {"id": "rsi_75_vn30",         "label": "% RSI>75 (VN30)",               "column": "rsi_75_vn30",          "group": "RSI"},
+    {"id": "rsi_75_hnx30",        "label": "% RSI>75 (HNX30)",              "column": "rsi_75_hnx30",         "group": "RSI"},
+    {"id": "rsi_75_hnx",          "label": "% RSI>75 (HNX)",                "column": "rsi_75_hnx",           "group": "RSI"},
+    # Bollinger
+    {"id": "bb_under_2std_hnx",   "label": "% Below -2σ BB (HNX)",          "column": "bb_under_2std_hnx",    "group": "Bollinger"},
+    # Return
+    {"id": "return_12m_vnall",    "label": "12M Return Count (VNALL)",      "column": "return_12m_vnall",     "group": "Return"},
+    {"id": "return_12m_vn30",     "label": "12M Return % (VN30)",           "column": "return_12m_vn30",      "group": "Return"},
 ]
 
 
+# ---------------------------------------------------------------------------
+# Sectors (kept from original sectors_relative_performance.csv)
+# ---------------------------------------------------------------------------
 SECTORS = [
     ("VNFIN",  "Financials"),
     ("VNMAT",  "Materials"),
@@ -382,10 +323,12 @@ SECTORS = [
 
 
 def compute_sectors():
-    df = _read("sectors_relative_performance.csv")
-    if df.empty:
+    p = DATA_DIR / "sectors_relative_performance.csv"
+    if not p.exists():
         return None
-    df = _dates(df)
+    df = pd.read_csv(p)
+    df["Date"] = pd.to_datetime(df["Date"]).dt.date
+    df.rename(columns={"Date": "date"}, inplace=True)
     df.sort_values("date", inplace=True)
     df.reset_index(drop=True, inplace=True)
 
@@ -399,32 +342,25 @@ def compute_sectors():
         series = df[code].astype(float)
         cur = series.iloc[-1] if not series.empty else None
 
-        def pct_chg(n):
-            if len(series) <= n or series.iloc[-1] is None:
+        def pct_chg(n, s=series):
+            if len(s) <= n:
                 return None
-            prev = series.iloc[-n - 1]
-            if prev == 0 or np.isnan(prev):
+            prev = s.iloc[-n - 1]
+            if prev == 0 or (isinstance(prev, float) and math.isnan(prev)):
                 return None
-            return round((float(series.iloc[-1]) / float(prev) - 1) * 100, 2)
+            return round((float(s.iloc[-1]) / float(prev) - 1) * 100, 2)
 
         sector_data.append({
-            "code": code,
-            "label": label,
+            "code": code, "label": label,
             "current": clean(cur),
-            "chg_1d":  pct_chg(1),
-            "chg_1w":  pct_chg(5),
-            "chg_1m":  pct_chg(21),
-            "chg_3m":  pct_chg(63),
-            "chg_6m":  pct_chg(126),
-            "chg_1y":  pct_chg(252),
+            "chg_1d": pct_chg(1),  "chg_1w": pct_chg(5),
+            "chg_1m": pct_chg(21), "chg_3m": pct_chg(63),
+            "chg_6m": pct_chg(126),"chg_1y": pct_chg(252),
         })
 
-    # Build time series for chart (last 504 rows)
     slice_df = df.tail(504)
     dates = [str(d) for d in slice_df["date"]]
-    series_out = {}
-    for code, _ in SECTORS:
-        series_out[code] = [clean(v) for v in slice_df[code].tolist()]
+    series_out = {code: [clean(v) for v in slice_df[code].tolist()] for code, _ in SECTORS}
 
     return {
         "sectors": sector_data,
@@ -434,34 +370,30 @@ def compute_sectors():
     }
 
 
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 def main():
     print("=== VN Market Breadth — compute static data ===")
 
-    print("Loading CSVs...")
+    print("Loading CSV2 files...")
     df = build_df()
-    if df.empty:
-        print("ERROR: no data, aborting")
-        sys.exit(1)
     print(f"  Merged: {len(df)} rows, {len(df.columns)} cols")
+    print(f"  Date range: {df['date'].iloc[0]} → {df['date'].iloc[-1]}")
 
-    print("Computing indicators...")
+    print("Computing derived indicators...")
     df = compute_indicators(df)
-    print(f"  Computed: {len(df.columns)} total cols")
+    print(f"  Total columns: {len(df.columns)}")
 
-    # Convert date column to string
     df["date"] = df["date"].astype(str)
+    records = [{k: clean(v) for k, v in row.items()} for _, row in df.iterrows()]
 
-    # Serialize all rows
-    records = []
-    for _, row in df.iterrows():
-        records.append({k: clean(v) for k, v in row.items()})
-
-    # --- historical.json ---
+    # historical.json
     out = OUT_DIR / "historical.json"
-    out.write_text(json.dumps(records, separators=(",", ":")))
+    out.write_text(json.dumps(records, separators=(",", ":")), encoding="utf-8")
     print(f"  historical.json: {len(records)} rows ({out.stat().st_size // 1024} KB)")
 
-    # --- overview.json ---
+    # overview.json
     latest = records[-1] if records else {}
     score = calc_breadth_score(latest)
     (OUT_DIR / "overview.json").write_text(json.dumps({
@@ -470,30 +402,34 @@ def main():
         "breadth_label": get_label(score),
         "signals_active": [],
         "total_rows": len(records),
-    }, separators=(",", ":")))
+    }, separators=(",", ":")), encoding="utf-8")
     print(f"  overview.json: score={score}, label={get_label(score)}")
 
-    # --- signals.json ---
-    df_for_sig = df.copy()
-    df_for_sig["date"] = pd.to_datetime(df_for_sig["date"]).dt.date
-    signals = compute_signals(df_for_sig)
-    (OUT_DIR / "signals.json").write_text(json.dumps(signals, separators=(",", ":")))
+    # signals.json
+    df_sig = df.copy()
+    df_sig["date"] = pd.to_datetime(df_sig["date"]).dt.date
+    signals = compute_signals(df_sig)
+    (OUT_DIR / "signals.json").write_text(json.dumps(signals, separators=(",", ":")), encoding="utf-8")
     print(f"  signals.json: {len(signals)} events")
 
-    # --- indicator_list.json ---
-    (OUT_DIR / "indicator_list.json").write_text(json.dumps(INDICATOR_LIST, separators=(",", ":")))
+    # indicator_list.json
+    (OUT_DIR / "indicator_list.json").write_text(
+        json.dumps(INDICATOR_LIST, separators=(",", ":")), encoding="utf-8"
+    )
     print(f"  indicator_list.json: {len(INDICATOR_LIST)} indicators")
 
-    # --- sectors.json ---
+    # sectors.json
     print("Computing sectors...")
     sectors_data = compute_sectors()
     if sectors_data:
-        (OUT_DIR / "sectors.json").write_text(json.dumps(sectors_data, separators=(",", ":")))
+        (OUT_DIR / "sectors.json").write_text(
+            json.dumps(sectors_data, separators=(",", ":")), encoding="utf-8"
+        )
         print(f"  sectors.json: {len(sectors_data['sectors'])} sectors, last={sectors_data['last_date']}")
     else:
         print("  sectors.json: SKIPPED (no data)")
 
-    print("=== Done! ===")
+    print(f"=== Done! {len(INDICATOR_LIST)} indicators from CSV2 data ===")
 
 
 if __name__ == "__main__":

@@ -6,9 +6,12 @@ import { fmt, retColor } from '../utils/format'
 
 const DAYS_OPTIONS = [252, 504, 1260, 3000]
 const INDICATORS = [
-  { id: 'up_volume_pct',       label: 'Up Volume % of Total',          color: '#3fb950', zero: false },
-  { id: 'uv_dv_ratio',         label: 'Up / Down Volume Ratio',         color: '#58a6ff', zero: false },
-  { id: 'net_up_volume_ema10', label: 'Net Up Volume (10d EMA)',         color: '#a371f7', zero: true  },
+  { id: 'up_volume_pct',       label: 'Up Volume % (HNX)',            color: '#3fb950', zero: false },
+  { id: 'uv_dv_ratio',         label: 'Up/Down Volume Ratio (HNX)',   color: '#58a6ff', zero: false },
+  { id: 'net_up_volume_ema10', label: 'Net Up Volume 10d EMA (HNX)',  color: '#a371f7', zero: true  },
+  { id: 'up_vol_hnx',          label: 'Up Volume Raw (HNX)',          color: '#56d364', zero: false },
+  { id: 'down_vol_hnx30',      label: 'Down Volume Raw (HNX30)',      color: '#f85149', zero: false },
+  { id: 'unchanged_upcom',     label: 'Unchanged Stocks (UPCOM)',     color: '#d29922', zero: false },
 ]
 
 function IndicatorPanel({ id, label, color, zero, days }: {
@@ -35,7 +38,9 @@ export default function VolumeBreadth() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-brand-text">Volume Breadth</h1>
-          <p className="text-xs text-brand-muted mt-0.5">Group C — Up/Down Volume phân tích theo ngày</p>
+          <p className="text-xs text-brand-muted mt-0.5">
+            Up/Down Volume phân tích — HNX và UPCOM
+          </p>
         </div>
         <div className="flex gap-1">
           {DAYS_OPTIONS.map(d => (
@@ -53,7 +58,6 @@ export default function VolumeBreadth() {
         {INDICATORS.map(ind => <IndicatorPanel key={ind.id} {...ind} days={days} />)}
       </div>
 
-      {/* Volume Thrust events */}
       {volumeThrust && volumeThrust.length > 0 && (
         <div className="card">
           <div className="text-sm font-semibold text-brand-accent mb-3">Volume Thrust Events — Forward Returns</div>
@@ -69,7 +73,7 @@ export default function VolumeBreadth() {
               </tr>
             </thead>
             <tbody>
-              {volumeThrust.map(e => (
+              {volumeThrust.slice(-20).reverse().map(e => (
                 <tr key={e.id} className="border-b border-brand-border/30 hover:bg-brand-border/20">
                   <td className="py-1.5 pr-4 text-brand-accent">{e.date}</td>
                   <td className="text-right pr-4">{fmt(e.vnindex_at_signal, 0)}</td>

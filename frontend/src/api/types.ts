@@ -2,52 +2,49 @@ export interface BreadthDay {
   date: string
   vnindex_close: number | null
 
-  // Raw
-  advances: number | null
-  declines: number | null
-  unchanged: number | null
-  total_stocks: number | null
-  new_highs: number | null
-  new_lows: number | null
-  up_volume: number | null
-  down_volume: number | null
-
-  // Group A
-  ad_line: number | null
-  mcclellan_osc: number | null
+  // A/D — from CSV2: ADLines_VN30, McClellanOsc_ratio_VN100, Declines_VN30
+  adline_vn30: number | null
+  mcclellan_osc_vn100: number | null
   mcclellan_sum: number | null
-  ad_ratio_5d: number | null
-  ad_ratio_10d: number | null
-  breadth_thrust: number | null
   ad_oscillator: number | null
-  abs_breadth_index: number | null
   roc5_ad: number | null
+  abs_breadth_index: number | null
+  declines_vn30: number | null
 
-  // Group B
-  nh_nl_line: number | null
-  nh_nl_osc: number | null
-  nh_nl_ratio: number | null
-  hindenburg_omen: boolean | null
+  // NH-NL — from CSV2: New_High_52_VN30_week, New_High_1_HNX30_month
+  new_high_52w_vn30: number | null
+  new_high_1m_hnx30: number | null
 
-  // Group C
-  uv_dv_ratio: number | null
+  // Volume — from CSV2: UpVolume_Hnx, DownVolume_HNX30, Unchanged_Upcom
+  up_vol_hnx: number | null
+  down_vol_hnx30: number | null
+  unchanged_upcom: number | null
   up_volume_pct: number | null
+  uv_dv_ratio: number | null
   net_up_volume_ema10: number | null
-  volume_thrust_signal: boolean | null
 
-  // Group D
-  pct_above_ma10: number | null
-  pct_above_ma20: number | null
-  pct_above_ma50: number | null
-  pct_above_ma100: number | null
-  pct_above_ma200: number | null
-  participation_index: number | null
+  // % Above MA — from CSV2: Above_Ma_100_VN100
+  above_ma100_vn100: number | null
   disparity_index: number | null
 
-  // Group E
-  daily_ad_ratio_2pct: number | null
-  quarterly_breadth_up: number | null
-  quarterly_breadth_down: number | null
+  // RSI — from CSV2: RSI_25/75 × 5 indices
+  rsi_25_vnindex: number | null
+  rsi_25_vn100: number | null
+  rsi_25_vn30: number | null
+  rsi_25_hnx30: number | null
+  rsi_25_hnx: number | null
+  rsi_75_vnindex: number | null
+  rsi_75_vn100: number | null
+  rsi_75_vn30: number | null
+  rsi_75_hnx30: number | null
+  rsi_75_hnx: number | null
+
+  // Bollinger — from CSV2: under_std_2_Hnx
+  bb_under_2std_hnx: number | null
+
+  // Return — from CSV2: Return_12_VNALL_month, Return_12_percent_VN30_month
+  return_12m_vnall: number | null
+  return_12m_vn30: number | null
 }
 
 export interface OverviewResponse {
@@ -70,6 +67,7 @@ export interface IndicatorMeta {
   id: string
   label: string
   column: string
+  group?: string
 }
 
 export interface SignalEvent {

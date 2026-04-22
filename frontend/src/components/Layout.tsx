@@ -32,7 +32,7 @@ export default function Layout() {
         {/* Logo */}
         <div className="px-4 py-4 border-b border-brand-border">
           <div className="text-brand-text font-bold text-sm">VN Market Breadth</div>
-          <div className="text-brand-muted text-xs font-mono mt-0.5">26 Indicators</div>
+          <div className="text-brand-muted text-xs font-mono mt-0.5">30 Indicators</div>
         </div>
 
         {/* Nav */}
